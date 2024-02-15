@@ -10,7 +10,7 @@ proxies = { 'http': 'http://190.103.177.131:80' }
 
 # Function to make a GET request
 def make_request(url, headers):
-    return requests.get(url, headers=headers, proxies=proxies)
+    return requests.get(url, proxies=proxies)
 
 # Function to parse the JSON response
 def parse_response(response):
