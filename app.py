@@ -21,7 +21,7 @@ headers = {
 
 # Function to make a GET request
 def make_request(url, headers):
-    return requests.get(url, headers=headers)
+    return requests.get(url)
 
 # Function to parse the JSON response
 def parse_response(response):
