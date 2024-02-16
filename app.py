@@ -99,14 +99,16 @@ def display_filtered_companies(filtered_companies):
     table_data = {
         "Horario": [],
         "Empresa": [],
-        "Variaciones": []
+        "Variaciones (%)": []
     }
     for item in filtered_companies:
         time_emoji = '🌞' if item['time'] == 'time-pre-market' else '🌛'
-        for variance in item['variances']:
-            table_data["Horario"].append(time_emoji)
-            table_data["Empresa"].append(item['symbol'])
-            table_data["Variaciones"].append(f"{variance}%")
+        # Concatenate variances into a comma-separated string
+        variance_string = ', '.join(map(str, item['variances']))
+
+        table_data["Horario"].append(time_emoji)
+        table_data["Empresa"].append(item['symbol'])
+        table_data["Variaciones (%)"].append(f"{variance_string}")
     
     # Create a DataFrame with the table data
     df = pd.DataFrame(table_data)
