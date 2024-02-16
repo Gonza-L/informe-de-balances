@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 import concurrent.futures
+import json
 
 # Function to make a GET request with retry mechanism
 def make_request_with_retry(url):
@@ -28,7 +29,15 @@ def make_request_with_retry(url):
 
 # Function to parse the JSON response
 def parse_response(response):
-    return response.json()
+    try:
+        response_json = response.json()
+        return response_json
+    except json.JSONDecodeError as json_error:
+        st.error(f"Error decoding JSON: {json_error}")
+        return None
+    except Exception as e:
+        st.error(f"An error occurred while parsing the response: {e}")
+        return None
 
 # Function to filter rows based on time
 def filter_rows(response_data):
