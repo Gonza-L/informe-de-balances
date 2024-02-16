@@ -5,12 +5,13 @@ from datetime import datetime, timedelta
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 import concurrent.futures
+import time
 
 # Function to make a GET request with retry mechanism
 def make_request_with_retry(url):
     session = requests.Session()
     retry_strategy = Retry(
-        total=10,
+        total=7,
         status_forcelist=[403],  # Retry on specific status codes
         backoff_factor=0.2
     )
@@ -56,29 +57,41 @@ def make_historical_data_request(symbol, date_reported, time_slot):
 
 # Function to fetch variances
 def fetch_variances(time_slot, symbol, date_reported_list):
-    variances = []
+    variances_dict = {date_reported: [] for date_reported in date_reported_list}
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
-        futures = [executor.submit(make_historical_data_request, symbol, date_reported, time_slot) for date_reported in date_reported_list]
+        # Submit tasks to fetch variances concurrently
+        futures = {executor.submit(fetch_variance_for_date, time_slot, symbol, date_reported): date_reported for date_reported in date_reported_list}
         
         for future in concurrent.futures.as_completed(futures):
-            response = future.result()
-            if response.status_code == 200:
-                try:
-                    historical_data = response.json()
-                    last_row = historical_data.get('data', {}).get('tradesTable', {}).get('rows', [])[-1]
-                    last_open = float(last_row['open'].strip('$').replace(',', ''))
-                    last_close = float(last_row['close'].strip('$').replace(',', ''))
-                    variance = int(((last_close - last_open) / last_open) * 100)
-                    variances.append(variance)
-                except (AttributeError):
-                    continue
+            date_reported = futures[future]
+            try:
+                variances = future.result()
+                if variances:
+                    variances_dict[date_reported] = variances
+            except Exception as exc:
+                print(f"Error fetching variances for {date_reported}: {exc}")
 
+    # Flatten the variances dictionary into a list of variance values
+    variances = [variance for variances_list in variances_dict.values() for variance in variances_list]
+    
     return variances
+
+def fetch_variance_for_date(time_slot, symbol, date_reported):
+    response = make_historical_data_request(symbol, date_reported, time_slot)
+    if response.status_code == 200:
+        historical_data = response.json()
+        last_row = historical_data.get('data', {}).get('tradesTable', {}).get('rows', [])[-1]
+        last_open = float(last_row['open'].strip('$').replace(',', ''))
+        last_close = float(last_row['close'].strip('$').replace(',', ''))
+        variance = int(((last_close - last_open) / last_open) * 100)
+        return [variance]
+    else:
+        return []
 
 # Function to fetch data for selected date
 def fetch_data(selected_date):
-    url = f"https://api.nasdaq.com/api/calendar/earnings?date={selected_date.strftime('%Y-%m-%d')}"
+    url = f"https://api.nasdaq.com/api/calendar/earnings?date={selected_date}"
     response = make_request_with_retry(url)
     
     if response.status_code != 200:
