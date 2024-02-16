@@ -75,7 +75,7 @@ def display_progress(companies_list):
     
     with st.progress(0):
         for idx, item in enumerate(companies_list, start=1):
-            date_reported_list = extract_date_reported(parse_response(make_request(f"https://api.nasdaq.com/api/company/{item['symbol']}/earnings-surprise", headers)))
+            date_reported_list = extract_date_reported(parse_response(make_request(f"https://api.nasdaq.com/api/company/{item['symbol']}/earnings-surprise")))
             if date_reported_list:
                 variances = fetch_variances(item['time'], item['symbol'], date_reported_list)
                 if variances:
