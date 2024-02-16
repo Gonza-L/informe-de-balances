@@ -41,11 +41,11 @@ def extract_companies(filtered_rows):
 
 # Function to extract 'dateReported' for each company
 def extract_date_reported(response_data):
-    if not response_data or not response_data.get('data') or not response_data['data'].get('earningsSurpriseTable'):
+    try:
+        earnings_data = response_data['data']['earningsSurpriseTable'].get('rows', [])
+        return [item['dateReported'] for item in earnings_data]
+    except (AttributeError):
         return []
-    
-    earnings_data = response_data['data']['earningsSurpriseTable'].get('rows', [])
-    return [item['dateReported'] for item in earnings_data]
 
 # Function to make historical data request
 def make_historical_data_request(symbol, date_reported, time_slot):
@@ -64,12 +64,15 @@ def fetch_variances(time_slot, symbol, date_reported_list):
         for future in concurrent.futures.as_completed(futures):
             response = future.result()
             if response.status_code == 200:
-                historical_data = response.json()
-                last_row = historical_data.get('data', {}).get('tradesTable', {}).get('rows', [])[-1]
-                last_open = float(last_row['open'].strip('$').replace(',', ''))
-                last_close = float(last_row['close'].strip('$').replace(',', ''))
-                variance = int(((last_close - last_open) / last_open) * 100)
-                variances.append(variance)
+                try:
+                    historical_data = response.json()
+                    last_row = historical_data.get('data', {}).get('tradesTable', {}).get('rows', [])[-1]
+                    last_open = float(last_row['open'].strip('$').replace(',', ''))
+                    last_close = float(last_row['close'].strip('$').replace(',', ''))
+                    variance = int(((last_close - last_open) / last_open) * 100)
+                    variances.append(variance)
+                except (AttributeError):
+                    continue
 
     return variances
 
