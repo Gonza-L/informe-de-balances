@@ -5,7 +5,6 @@ from datetime import datetime, timedelta
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 import concurrent.futures
-import time
 
 # Function to make a GET request with retry mechanism
 def make_request_with_retry(url):
