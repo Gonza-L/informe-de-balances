@@ -22,7 +22,7 @@ proxy_port = '80'
 proxy_cycle = cycle(proxy_ips)
 
 # Function to make a GET request using the rotating proxy
-def make_request(url):
+def make_request(url, headers):
     proxy = next(proxy_cycle)
     proxies = {
         'http': f'http://{proxy}:{proxy_port}'
