@@ -10,7 +10,7 @@ import concurrent.futures
 def make_request_with_retry(url):
     session = requests.Session()
     retry_strategy = Retry(
-        total=7,
+        total=10,
         status_forcelist=[403],  # Retry on specific status codes
         backoff_factor=0.2
     )
