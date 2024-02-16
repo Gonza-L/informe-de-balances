@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 headers = {"User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:122.0) Gecko/20100101 Firefox/122.0"}
 
 # Define proxy settings
-proxies = { 'http': 'http://141.193.213.16:80' }
+proxies = { 'http': 'http://141.193.213.8:80' }
 
 # Function to make a GET request
 def make_request(url, headers):
