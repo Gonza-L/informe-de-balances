@@ -8,6 +8,7 @@ headers = {"User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:122.0) Geck
 
 # Define the list of proxy IP addresses
 proxy_ips = [
+    '190.103.177.131',
     '50.239.72.17',
     '50.230.222.202',
     '68.188.59.198',
