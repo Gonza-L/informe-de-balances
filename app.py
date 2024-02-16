@@ -19,7 +19,8 @@ def make_request_with_retry(url):
     session.mount("http://", adapter)
     
     try:
-        response = session.get(url)
+        headers = {"User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:122.0) Gecko/20100101 Firefox/122.0"}
+        response = session.get(url, headers=headers)
         response.raise_for_status()  # Raise HTTPError for bad status codes
         return response
     except requests.RequestException as e:
