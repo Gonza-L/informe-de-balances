@@ -12,7 +12,6 @@ def make_request_with_retry(url):
     retry_strategy = Retry(
         total=69,
         status_forcelist=[403],  # Retry on specific status codes
-        method_whitelist=["GET"],
         backoff_factor=1
     )
     adapter = HTTPAdapter(max_retries=retry_strategy)
