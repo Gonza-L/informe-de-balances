@@ -42,7 +42,7 @@ def extract_companies(filtered_rows):
 # Function to extract 'dateReported' for each company
 def extract_date_reported(response_data):
     try:
-        earnings_data = response_data['data']['earningsSurpriseTable'].get('rows', [])
+        earnings_data = response_data.get('data', {}).get('earningsSurpriseTable', {}).get('rows', [])
         return [item['dateReported'] for item in earnings_data]
     except (AttributeError):
         return []
