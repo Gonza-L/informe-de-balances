@@ -3,10 +3,9 @@ import pandas as pd
 import requests
 from datetime import datetime, timedelta
 
-headers = {"User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:122.0) Gecko/20100101 Firefox/122.0"}
-
 # Function to make a GET request
-def make_request(url, headers):
+def make_request(url):
+    headers = {"User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:122.0) Gecko/20100101 Firefox/122.0"}
     return requests.get(url, headers=headers)
 
 # Function to parse the JSON response
@@ -31,18 +30,18 @@ def extract_date_reported(response_data):
     return [item['dateReported'] for item in earnings_data]
 
 # Function to make historical data request
-def make_historical_data_request(symbol, date_reported, time_slot, headers):
+def make_historical_data_request(symbol, date_reported, time_slot):
     from_date = (datetime.strptime(date_reported, '%m/%d/%Y') + timedelta(days=1 if time_slot == 'time-after-hours' else 0)).strftime('%Y-%m-%d')
     
     url = f"https://api.nasdaq.com/api/quote/{symbol}/historical?assetclass=stocks&fromdate={from_date}&limit=365"
-    return requests.get(url, headers=headers)
+    return make_request(url)
 
 # Function to fetch variances
-def fetch_variances(time_slot, symbol, headers, date_reported_list):
+def fetch_variances(time_slot, symbol, date_reported_list):
     variances = []
 
     for date_reported in date_reported_list:
-        response = make_historical_data_request(symbol, date_reported, time_slot, headers)
+        response = make_historical_data_request(symbol, date_reported, time_slot)
         if response.status_code == 200:
             historical_data = response.json()
             last_row = historical_data.get('data', {}).get('tradesTable', {}).get('rows', [])[-1]
@@ -56,7 +55,7 @@ def fetch_variances(time_slot, symbol, headers, date_reported_list):
 # Function to fetch data for selected date
 def fetch_data(selected_date):
     url = f"https://api.nasdaq.com/api/calendar/earnings?date={selected_date.strftime('%Y-%m-%d')}"
-    response = make_request(url, headers)
+    response = make_request(url)
     
     if response.status_code != 200:
         st.error(f"Request failed with status code: {response.status_code}")
@@ -78,7 +77,7 @@ def display_progress(companies_list):
         for idx, item in enumerate(companies_list, start=1):
             date_reported_list = extract_date_reported(parse_response(make_request(f"https://api.nasdaq.com/api/company/{item['symbol']}/earnings-surprise", headers)))
             if date_reported_list:
-                variances = fetch_variances(item['time'], item['symbol'], headers, date_reported_list)
+                variances = fetch_variances(item['time'], item['symbol'], date_reported_list)
                 if variances:
                     filtered_companies.append({**item, 'variances': variances})
                 
