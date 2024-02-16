@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import requests
 from datetime import datetime, timedelta
+import concurrent.futures
 
 # Function to make a GET request
 def make_request(url):
@@ -40,15 +41,18 @@ def make_historical_data_request(symbol, date_reported, time_slot):
 def fetch_variances(time_slot, symbol, date_reported_list):
     variances = []
 
-    for date_reported in date_reported_list:
-        response = make_historical_data_request(symbol, date_reported, time_slot)
-        if response.status_code == 200:
-            historical_data = response.json()
-            last_row = historical_data.get('data', {}).get('tradesTable', {}).get('rows', [])[-1]
-            last_open = float(last_row['open'].strip('$').replace(',', ''))
-            last_close = float(last_row['close'].strip('$').replace(',', ''))
-            variance = int(((last_close - last_open) / last_open) * 100)
-            variances.append(variance)
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        futures = [executor.submit(make_historical_data_request, symbol, date_reported, time_slot) for date_reported in date_reported_list]
+        
+        for future in concurrent.futures.as_completed(futures):
+            response = future.result()
+            if response.status_code == 200:
+                historical_data = response.json()
+                last_row = historical_data.get('data', {}).get('tradesTable', {}).get('rows', [])[-1]
+                last_open = float(last_row['open'].strip('$').replace(',', ''))
+                last_close = float(last_row['close'].strip('$').replace(',', ''))
+                variance = int(((last_close - last_open) / last_open) * 100)
+                variances.append(variance)
 
     return variances
 
