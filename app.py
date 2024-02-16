@@ -2,34 +2,12 @@ import streamlit as st
 import pandas as pd
 import requests
 from datetime import datetime, timedelta
-from itertools import cycle
 
 headers = {"User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:122.0) Gecko/20100101 Firefox/122.0"}
 
-# Define the list of proxy IP addresses
-proxy_ips = [
-    '190.103.177.131',
-    '50.239.72.17',
-    '50.230.222.202',
-    '68.188.59.198',
-    '50.169.135.10',
-    '50.173.140.138',
-    '172.67.182.162'
-]
-
-# Define proxy port
-proxy_port = '80'
-
-# Create a cycle iterator to rotate through the proxy IP addresses
-proxy_cycle = cycle(proxy_ips)
-
-# Function to make a GET request using the rotating proxy
+# Function to make a GET request
 def make_request(url, headers):
-    proxy = next(proxy_cycle)
-    proxies = {
-        'http': f'http://{proxy}:{proxy_port}'
-    }
-    return requests.get(url, headers=headers, proxies=proxies)
+    return requests.get(url, headers=headers)
 
 # Function to parse the JSON response
 def parse_response(response):
