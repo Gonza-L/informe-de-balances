@@ -12,6 +12,11 @@ def make_request(url):
 def parse_response(response):
     return response.json()
 
+# Function to filter rows based on time
+def filter_rows(response_data):
+    filter_time = 'time-not-supplied'
+    return [row for row in response_data.get('data', {}).get('rows', []) if row.get('time') != filter_time]
+
 # Function to extract companies
 def extract_companies(filtered_rows):
     return [{"time": row['time'], "symbol": row['symbol']} for row in filtered_rows]
