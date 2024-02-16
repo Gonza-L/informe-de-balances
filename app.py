@@ -12,11 +12,6 @@ def make_request(url):
 def parse_response(response):
     return response.json()
 
-# Function to filter rows based on time
-def filter_rows(response_data):
-    filter_time = 'time-not-supplied'
-    return [row for row in response_data.get('data', {}).get('rows', []) if row.get('time') != filter_time]
-
 # Function to extract companies
 def extract_companies(filtered_rows):
     return [{"time": row['time'], "symbol": row['symbol']} for row in filtered_rows]
@@ -40,16 +35,36 @@ def make_historical_data_request(symbol, date_reported, time_slot):
 def fetch_variances(time_slot, symbol, date_reported_list):
     variances = []
 
-    for date_reported in date_reported_list:
-        response = make_historical_data_request(symbol, date_reported, time_slot)
-        if response.status_code == 200:
-            historical_data = response.json()
-            last_row = historical_data.get('data', {}).get('tradesTable', {}).get('rows', [])[-1]
-            last_open = float(last_row['open'].strip('$').replace(',', ''))
-            last_close = float(last_row['close'].strip('$').replace(',', ''))
-            variance = int(((last_close - last_open) / last_open) * 100)
-            variances.append(variance)
+    # Make historical data request outside of the date reported loop
+    response = make_historical_data_request(symbol, date_reported_list[-1], time_slot)
+    if response.status_code != 200:
+        st.warning(f"Failed to fetch historical data for {symbol}")
+        return variances
 
+    historical_data = response.json()
+    trades_rows = historical_data.get('data', {}).get('tradesTable', {}).get('rows', [])
+
+    # Iterate over reported dates and fetch variances
+    for date_reported in date_reported_list:
+        found_data = False
+        current_date = date_reported
+        while not found_data:
+            for row in trades_rows:
+                if row['date'] == current_date:
+                    # Extract open and close prices
+                    last_open = float(row['open'].strip('$').replace(',', ''))
+                    last_close = float(row['close'].strip('$').replace(',', ''))
+                    variance = int(((last_close - last_open) / last_open) * 100)
+                    variances.append(variance)
+                    found_data = True
+                    break
+            if not found_data:
+                # If data for the reported date is not found, move forward one day
+                current_date = (datetime.strptime(current_date, '%m/%d/%Y') + timedelta(days=1)).strftime('%m/%d/%Y')
+                if current_date > datetime.now().strftime('%m/%d/%Y'):
+                    # Stop iterating if we reach today's date
+                    st.warning(f"Reached today's date. No more data available for {symbol}.")
+                    break
     return variances
 
 # Function to fetch data for selected date
@@ -68,29 +83,8 @@ def fetch_data(selected_date):
 
     return response_data
 
-# Function to display progress
-def display_progress(companies_list):
-    filtered_companies = []
-    num_companies = len(companies_list)
-    
-    with st.progress(0):
-        for idx, item in enumerate(companies_list, start=1):
-            date_reported_list = extract_date_reported(parse_response(make_request(f"https://api.nasdaq.com/api/company/{item['symbol']}/earnings-surprise", headers)))
-            if date_reported_list:
-                variances = fetch_variances(item['time'], item['symbol'], date_reported_list)
-                if variances:
-                    filtered_companies.append({**item, 'variances': variances})
-                
-                completion_percentage = int((idx / num_companies) * 100)
-                st.progress(completion_percentage)
-        st.empty()
-    return filtered_companies
-
 # Function to display filtered companies
 def display_filtered_companies(filtered_companies):
-    # Filter companies with at least two variances above or equal to 5% or below or equal to -5%
-    filtered_companies = [company for company in filtered_companies if len([variance for variance in company['variances'] if not -5 < variance < 5]) >= 2]
-
     # Sort companies alphabetically by symbol
     filtered_companies.sort(key=lambda x: x['symbol'])
 
@@ -102,8 +96,7 @@ def display_filtered_companies(filtered_companies):
     }
     for item in filtered_companies:
         time_emoji = '🌞' if item['time'] == 'time-pre-market' else '🌛'
-        # Concatenate variances into a comma-separated string
-        variance_string = ', '.join(map(str, item['variances']))
+        variance_string = ', '.join(map(str, item['variance']))
 
         table_data["Horario"].append(time_emoji)
         table_data["Empresa"].append(item['symbol'])
