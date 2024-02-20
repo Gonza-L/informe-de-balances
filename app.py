@@ -86,7 +86,7 @@ def fetch_variances(time_slot, symbol, date_reported_list):
     
     average_variance = int(sum(variances) / len(variances))
 
-    return average_variance
+    return variances, average_variance
 
 def fetch_variance_for_date(time_slot, symbol, date_reported):
     response = make_historical_data_request(symbol, date_reported, time_slot)
@@ -166,6 +166,11 @@ def modify_tickers_list(tickers_list, action, ticker=None):
 
     return tickers_list
 
+# Function to save tickers list as JSON
+def save_tickers_list(tickers_list, filename='tickers.json'):
+    with open(filename, 'w') as f:
+        json.dump(tickers_list, f)
+
 # Function to fetch data for selected date
 def fetch_data(selected_date):
     url = f"https://api.nasdaq.com/api/calendar/earnings?date={selected_date}"
@@ -187,8 +192,8 @@ def display_progress(companies_list, tickers_list):
     filtered_companies = []
     num_companies = len(companies_list)
 
-    tickets_to_add = ['BXC', 'NOVA']
-    tickets_to_remove = ['MCW']
+    tickets_to_add = []
+    tickets_to_remove = ['CHDN', 'JXN', 'MCW', 'NDSN', 'OUT', 'PAAS', 'SSTK']
 
     for ticket in tickets_to_add:
         tickers_list = modify_tickers_list(tickers_list, 'add', ticket)
@@ -202,9 +207,12 @@ def display_progress(companies_list, tickers_list):
             if item['symbol'] in tickers_list:
                 date_reported_list = extract_date_reported(parse_response(make_request_with_retry(f"https://api.nasdaq.com/api/company/{item['symbol']}/earnings-surprise")))
                 if date_reported_list:
-                    average_variance = fetch_variances(item['time'], item['symbol'], date_reported_list)
-                    if average_variance > 5:
-                        filtered_companies.append({**item, 'avg': average_variance})
+                    variances, avg_variance = fetch_variances(item['time'], item['symbol'], date_reported_list)
+                    if variances and any(variance > 5 for variance in variances):
+                        # Format the variances string
+                        variances_str = ', '.join(map(str, variances)) + f" ({avg_variance})"
+                        # Append to the filtered companies list
+                        filtered_companies.append({**item, 'variances': variances_str})
                     
                     completion_percentage = int((idx / num_companies) * 100)
                     st.progress(completion_percentage)
@@ -213,20 +221,20 @@ def display_progress(companies_list, tickers_list):
 
 # Function to display filtered companies
 def display_filtered_companies(filtered_companies):
-    filtered_companies.sort(reverse=True, key=lambda x: x['avg'])
+    filtered_companies.sort(key=lambda x: x['symbol'])
 
     st.write("### Informe de Balances:")
     table_data = {
         "Horario": [],
         "Empresa": [],
-        "Promedio": []
+        "Promedio (%)": []
     }
     for item in filtered_companies:
         time_emoji = '🌞' if item['time'] == 'time-pre-market' else '🌛'
 
         table_data["Horario"].append(time_emoji)
         table_data["Empresa"].append(item['symbol'])
-        table_data["Promedio"].append(f"{item['avg']}%")
+        table_data["Promedio (%)"].append(item['variances'])
     
     # Create a DataFrame with the table data
     df = pd.DataFrame(table_data)

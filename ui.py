@@ -1,6 +1,6 @@
 import streamlit as st
 from datetime import datetime
-from app import fetch_data, fetch_tickers, filter_rows, extract_companies, display_progress, display_filtered_companies
+from app import fetch_data, fetch_tickers, filter_rows, extract_companies, display_progress, display_filtered_companies, save_tickers_list
 
 def main():
     st.title('Análisis de Empresas')
@@ -14,6 +14,9 @@ def main():
         companies_list = extract_companies(filtered_rows)
         filtered_companies = display_progress(companies_list, tickers_list)
         display_filtered_companies(filtered_companies)
+    
+    # Save tickers list as JSON
+    save_tickers_list(tickers_list)
 
 if __name__ == "__main__":
     main()
