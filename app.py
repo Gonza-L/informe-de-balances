@@ -6,6 +6,7 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 import concurrent.futures
 import json
+from bs4 import BeautifulSoup
 
 # Function to make a GET request with retry mechanism
 def make_request_with_retry(url):
@@ -83,7 +84,9 @@ def fetch_variances(time_slot, symbol, date_reported_list):
     # Flatten the variances dictionary into a list of variance values
     variances = [variance for variances_list in variances_dict.values() for variance in variances_list]
     
-    return variances
+    average_variance = int(sum(variances) / len(variances))
+
+    return average_variance
 
 def fetch_variance_for_date(time_slot, symbol, date_reported):
     response = make_historical_data_request(symbol, date_reported, time_slot)
@@ -92,10 +95,76 @@ def fetch_variance_for_date(time_slot, symbol, date_reported):
         last_row = historical_data.get('data', {}).get('tradesTable', {}).get('rows', [])[-1]
         last_open = float(last_row['open'].strip('$').replace(',', ''))
         last_close = float(last_row['close'].strip('$').replace(',', ''))
-        variance = int(((last_close - last_open) / last_open) * 100)
+        variance = int(abs(((last_close - last_open) / last_open) * 100))
         return [variance]
     else:
         return []
+
+def fetch_tickers(url):
+    """
+    Fetches the "Ticker" column data from the specified URL.
+    
+    Args:
+    - url (str): The URL of the webpage containing the table.
+    
+    Returns:
+    - tickers (list): A list of tickers extracted from the webpage.
+    """
+    # Fetch the content of the webpage
+    response = make_request_with_retry(url)
+    html_content = response.text
+
+    # Parse the HTML content
+    soup = BeautifulSoup(html_content, "html.parser")
+
+    # Find the table
+    table = soup.find("table")
+
+    # Initialize an empty list to store tickers
+    tickers = []
+
+    # Extract data from the table
+    if table:
+        rows = table.find_all("tr")
+        for row in rows:
+            cells = row.find_all("td")
+            if len(cells) > 2:  # Ensure the row has at least 3 cells
+                ticker = cells[2].text.strip()  # Extract the ticker from the third cell
+                tickers.append(ticker)
+
+    # Remove the first element since it's the header "Ticker"
+    tickers = tickers[1:]
+
+    return tickers
+
+def modify_tickers_list(tickers_list, action, ticker=None):
+    """
+    Modifies the tickers list based on the specified action.
+
+    Args:
+    - tickers_list (list): The list of tickers to be modified.
+    - action (str): The action to perform. Either 'add' or 'remove'.
+    - ticker (str, optional): The ticker to add or remove. Required if action is 'add'.
+
+    Returns:
+    - tickers_list (list): The modified list of tickers.
+    """
+    if action == 'add':
+        if ticker is not None:
+            tickers_list.append(ticker)
+            print(f"Added '{ticker}' to the tickers list.")
+        else:
+            print("Ticker is required for 'add' action.")
+    elif action == 'remove':
+        if ticker in tickers_list:
+            tickers_list.remove(ticker)
+            print(f"Removed '{ticker}' from the tickers list.")
+        else:
+            print(f"'{ticker}' not found in the tickers list.")
+    else:
+        print("Invalid action. Please use 'add' or 'remove'.")
+
+    return tickers_list
 
 # Function to fetch data for selected date
 def fetch_data(selected_date):
@@ -114,45 +183,50 @@ def fetch_data(selected_date):
     return response_data
 
 # Function to display progress
-def display_progress(companies_list):
+def display_progress(companies_list, tickers_list):
     filtered_companies = []
     num_companies = len(companies_list)
+
+    tickets_to_add = ['BXC', 'NOVA']
+    tickets_to_remove = ['MCW']
+
+    for ticket in tickets_to_add:
+        tickers_list = modify_tickers_list(tickers_list, 'add', ticket)
+    
+    for ticket in tickets_to_remove:
+        tickers_list = modify_tickers_list(tickers_list, 'remove', ticket)
     
     with st.progress(0):
         for idx, item in enumerate(companies_list, start=1):
-            date_reported_list = extract_date_reported(parse_response(make_request_with_retry(f"https://api.nasdaq.com/api/company/{item['symbol']}/earnings-surprise")))
-            if date_reported_list:
-                variances = fetch_variances(item['time'], item['symbol'], date_reported_list)
-                if variances:
-                    filtered_companies.append({**item, 'variances': variances})
-                
-                completion_percentage = int((idx / num_companies) * 100)
-                st.progress(completion_percentage)
+            # Check if the symbol is in the tickers list
+            if item['symbol'] in tickers_list:
+                date_reported_list = extract_date_reported(parse_response(make_request_with_retry(f"https://api.nasdaq.com/api/company/{item['symbol']}/earnings-surprise")))
+                if date_reported_list:
+                    average_variance = fetch_variances(item['time'], item['symbol'], date_reported_list)
+                    if average_variance > 5:
+                        filtered_companies.append({**item, 'avg': average_variance})
+                    
+                    completion_percentage = int((idx / num_companies) * 100)
+                    st.progress(completion_percentage)
         st.empty()
     return filtered_companies
 
 # Function to display filtered companies
 def display_filtered_companies(filtered_companies):
-    # Filter companies with at least two variances above or equal to 5% or below or equal to -5%
-    filtered_companies = [company for company in filtered_companies if len([variance for variance in company['variances'] if not -5 < variance < 5]) >= 2]
-
-    # Sort companies alphabetically by symbol
-    filtered_companies.sort(key=lambda x: x['symbol'])
+    filtered_companies.sort(reverse=True, key=lambda x: x['avg'])
 
     st.write("### Informe de Balances:")
     table_data = {
         "Horario": [],
         "Empresa": [],
-        "Variaciones (%)": []
+        "Promedio": []
     }
     for item in filtered_companies:
         time_emoji = '🌞' if item['time'] == 'time-pre-market' else '🌛'
-        # Concatenate variances into a comma-separated string
-        variance_string = ', '.join(map(str, item['variances']))
 
         table_data["Horario"].append(time_emoji)
         table_data["Empresa"].append(item['symbol'])
-        table_data["Variaciones (%)"].append(f"{variance_string}")
+        table_data["Promedio"].append(f"{item['avg']}%")
     
     # Create a DataFrame with the table data
     df = pd.DataFrame(table_data)
