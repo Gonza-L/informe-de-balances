@@ -98,7 +98,6 @@ def fetch_variances(time_slot, symbol, date_reported_list):
                 variances = future.result()
                 if variances:
                     variances_dict[date_reported] = variances
-                    st.write(f"Fetched variances for {symbol}, {date_reported}: {variances}")
             except Exception as exc:
                 print(f"Error fetching variances for {date_reported}: {exc}")
 
