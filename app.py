@@ -59,7 +59,27 @@ def extract_date_reported(response_data):
 
 # Function to make historical data request
 def make_historical_data_request(symbol, date_reported, time_slot):
-    from_date = (datetime.strptime(date_reported, '%m/%d/%Y') + timedelta(days=1 if time_slot == 'time-after-hours' else 0)).strftime('%Y-%m-%d')
+    date_reported_dt = datetime.strptime(date_reported, '%m/%d/%Y')
+    
+    if time_slot == 'time-pre-market':
+        # Start from the date reported and go back until finding a record that isn't the date reported
+        current_date = date_reported_dt - timedelta(days=1)
+        while True:
+            current_date_str = current_date.strftime('%Y-%m-%d')
+            url = f"https://api.nasdaq.com/api/quote/{symbol}/historical?assetclass=stocks&fromdate={current_date_str}&limit=365"
+            response = make_request_with_retry(url)
+            if response and response.status_code == 200:
+                historical_data = response.json()
+                trades_table = historical_data.get('data', {}).get('tradesTable', {}).get('rows', [])
+                if trades_table:
+                    last_date = datetime.strptime(trades_table[-1]['date'], '%m/%d/%Y')
+                    if last_date != date_reported_dt:
+                        from_date = last_date.strftime('%Y-%m-%d')
+                        break
+            # Move to the previous day
+            current_date -= timedelta(days=1)
+    else:
+        from_date = date_reported_dt.strftime('%Y-%m-%d')
     
     url = f"https://api.nasdaq.com/api/quote/{symbol}/historical?assetclass=stocks&fromdate={from_date}&limit=365"
     return make_request_with_retry(url)
@@ -78,27 +98,36 @@ def fetch_variances(time_slot, symbol, date_reported_list):
                 variances = future.result()
                 if variances:
                     variances_dict[date_reported] = variances
+                    st.write(f"Fetched variances for {symbol}, {date_reported}: {variances}")
             except Exception as exc:
                 print(f"Error fetching variances for {date_reported}: {exc}")
 
     # Flatten the variances dictionary into a list of variance values
     variances = [variance for variances_list in variances_dict.values() for variance in variances_list]
     
-    average_variance = int(sum(variances) / len(variances))
+    average_variance = int(sum(variances) / len(variances)) if variances else 0
 
     return variances, average_variance
 
 def fetch_variance_for_date(time_slot, symbol, date_reported):
     response = make_historical_data_request(symbol, date_reported, time_slot)
-    if response.status_code == 200:
+    if response and response.status_code == 200:
         historical_data = response.json()
-        last_row = historical_data.get('data', {}).get('tradesTable', {}).get('rows', [])[-1]
-        last_open = float(last_row['open'].strip('$').replace(',', ''))
-        last_close = float(last_row['close'].strip('$').replace(',', ''))
-        variance = int(abs(((last_close - last_open) / last_open) * 100))
-        return [variance]
+        trades_table = historical_data.get('data', {}).get('tradesTable', {}).get('rows', [])
+
+        if len(trades_table) >= 2:  # Ensure there are at least two rows for calculation
+            penultimate_close = float(trades_table[-2]['close'].strip('$').replace(',', ''))
+            last_close = float(trades_table[-1]['close'].strip('$').replace(',', ''))
+            
+            if last_close != 0:  # Avoid division by zero
+                variance = int(abs(((penultimate_close - last_close) / last_close) * 100))
+                return [variance]
+            else:
+                return []
+        else:
+            return []  # Insufficient data for calculation
     else:
-        return []
+        return []  # Failed to fetch historical data or status code is not 200
 
 def fetch_tickers(url):
     """
