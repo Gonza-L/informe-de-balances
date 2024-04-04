@@ -10,6 +10,7 @@ from bs4 import BeautifulSoup
 
 # Function to make a GET request with retry mechanism
 def make_request_with_retry(url):
+    st.write(f"Making request to {url}")
     session = requests.Session()
     retry_strategy = Retry(
         total=7,
@@ -23,9 +24,12 @@ def make_request_with_retry(url):
     try:
         headers = {"User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:122.0) Gecko/20100101 Firefox/122.0"}
         response = session.get(url, headers=headers)
+        st.write(f"Request to {url} completed with status code: {response.status_code}")
         response.raise_for_status()  # Raise HTTPError for bad status codes
+        st.write(f"Response from {url} is valid")
         return response
     except requests.RequestException as e:
+        st.write(f"Error occurred while making request to {url}: {e}")
         return None
 
 # Function to parse the JSON response
@@ -165,35 +169,6 @@ def fetch_tickers(url):
 
     return tickers
 
-def modify_tickers_list(tickers_list, action, ticker=None):
-    """
-    Modifies the tickers list based on the specified action.
-
-    Args:
-    - tickers_list (list): The list of tickers to be modified.
-    - action (str): The action to perform. Either 'add' or 'remove'.
-    - ticker (str, optional): The ticker to add or remove. Required if action is 'add'.
-
-    Returns:
-    - tickers_list (list): The modified list of tickers.
-    """
-    if action == 'add':
-        if ticker is not None:
-            tickers_list.append(ticker)
-            print(f"Added '{ticker}' to the tickers list.")
-        else:
-            print("Ticker is required for 'add' action.")
-    elif action == 'remove':
-        if ticker in tickers_list:
-            tickers_list.remove(ticker)
-            print(f"Removed '{ticker}' from the tickers list.")
-        else:
-            print(f"'{ticker}' not found in the tickers list.")
-    else:
-        print("Invalid action. Please use 'add' or 'remove'.")
-
-    return tickers_list
-
 # Function to save tickers list as JSON
 def save_tickers_list(tickers_list, filename='tickers.json'):
     with open(filename, 'w') as f:
@@ -219,15 +194,6 @@ def fetch_data(selected_date):
 def display_progress(companies_list, tickers_list):
     filtered_companies = []
     num_companies = len(companies_list)
-
-    tickets_to_add = []
-    tickets_to_remove = ['CHDN', 'JXN', 'MCW', 'NDSN', 'OUT', 'PAAS', 'SSTK']
-
-    for ticket in tickets_to_add:
-        tickers_list = modify_tickers_list(tickers_list, 'add', ticket)
-    
-    for ticket in tickets_to_remove:
-        tickers_list = modify_tickers_list(tickers_list, 'remove', ticket)
     
     with st.progress(0):
         for idx, item in enumerate(companies_list, start=1):
