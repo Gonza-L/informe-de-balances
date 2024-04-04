@@ -10,7 +10,6 @@ from bs4 import BeautifulSoup
 
 # Function to make a GET request with retry mechanism
 def make_request_with_retry(url):
-    st.write(f"Making request to {url}")
     session = requests.Session()
     retry_strategy = Retry(
         total=7,
@@ -24,12 +23,9 @@ def make_request_with_retry(url):
     try:
         headers = {"User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:122.0) Gecko/20100101 Firefox/122.0"}
         response = session.get(url, headers=headers)
-        st.write(f"Request to {url} completed with status code: {response.status_code}")
         response.raise_for_status()  # Raise HTTPError for bad status codes
-        st.write(f"Response from {url} is valid")
         return response
     except requests.RequestException as e:
-        st.write(f"Error occurred while making request to {url}: {e}")
         return None
 
 # Function to parse the JSON response
