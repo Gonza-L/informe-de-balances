@@ -173,18 +173,19 @@ def save_tickers_list(tickers_list, filename='tickers.json'):
 # Function to fetch data for selected date
 def fetch_data(selected_date):
     url = f"https://api.nasdaq.com/api/calendar/earnings?date={selected_date}"
-    response = make_request_with_retry(url)
-    
-    if response.status_code != 200:
-        st.error(f"Request failed with status code: {response.status_code}")
-        return None
-    
-    response_data = parse_response(response)
-    if not response_data or not response_data.get('data', {}).get('rows'):
-        st.write("No hay datos disponibles para la fecha seleccionada.")
-        return None
+    try:
+        response = make_request_with_retry(url)
+        response.raise_for_status()  # Raise an exception if the request was not successful
+        response_data = parse_response(response)
+        if not response_data or not response_data.get('data', {}).get('rows'):
+            st.write("No hay datos disponibles para la fecha seleccionada.")
+            return None
 
-    return response_data
+        return response_data
+
+    except requests.exceptions.RequestException as e:
+        st.error(f"Request failed: {e}")
+        return None
 
 # Function to display progress
 def display_progress(companies_list, tickers_list):
