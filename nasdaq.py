@@ -6,7 +6,6 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 import concurrent.futures
 import json
-from bs4 import BeautifulSoup
 
 # Function to make a GET request with retry mechanism
 def make_request_with_retry(url):
@@ -128,48 +127,6 @@ def fetch_variance_for_date(time_slot, symbol, date_reported):
     else:
         return []  # Failed to fetch historical data or status code is not 200
 
-def fetch_tickers(url):
-    """
-    Fetches the "Ticker" column data from the specified URL.
-    
-    Args:
-    - url (str): The URL of the webpage containing the table.
-    
-    Returns:
-    - tickers (list): A list of tickers extracted from the webpage.
-    """
-    # Fetch the content of the webpage
-    response = make_request_with_retry(url)
-    html_content = response.text
-
-    # Parse the HTML content
-    soup = BeautifulSoup(html_content, "html.parser")
-
-    # Find the table
-    table = soup.find("table")
-
-    # Initialize an empty list to store tickers
-    tickers = []
-
-    # Extract data from the table
-    if table:
-        rows = table.find_all("tr")
-        for row in rows:
-            cells = row.find_all("td")
-            if len(cells) > 2:  # Ensure the row has at least 3 cells
-                ticker = cells[2].text.strip()  # Extract the ticker from the third cell
-                tickers.append(ticker)
-
-    # Remove the first element since it's the header "Ticker"
-    tickers = tickers[1:]
-
-    return tickers
-
-# Function to save tickers list as JSON
-def save_tickers_list(tickers_list, filename='tickers.json'):
-    with open(filename, 'w') as f:
-        json.dump(tickers_list, f)
-
 # Function to fetch data for selected date
 def fetch_data(selected_date):
     url = f"https://api.nasdaq.com/api/calendar/earnings?date={selected_date}"
@@ -186,48 +143,3 @@ def fetch_data(selected_date):
     except requests.exceptions.RequestException as e:
         st.error(f"Request failed: {e}")
         return None
-
-# Function to display progress
-def display_progress(companies_list, tickers_list):
-    filtered_companies = []
-    num_companies = len(companies_list)
-    
-    with st.progress(0):
-        for idx, item in enumerate(companies_list, start=1):
-            # Check if the symbol is in the tickers list
-            if item['symbol'] in tickers_list:
-                date_reported_list = extract_date_reported(parse_response(make_request_with_retry(f"https://api.nasdaq.com/api/company/{item['symbol']}/earnings-surprise")))
-                if date_reported_list:
-                    variances, avg_variance = fetch_variances(item['time'], item['symbol'], date_reported_list)
-                    if variances and any(variance > 5 for variance in variances):
-                        # Format the variances string
-                        variances_str = ', '.join(map(str, variances)) + f" ({avg_variance})"
-                        # Append to the filtered companies list
-                        filtered_companies.append({**item, 'variances': variances_str})
-                    
-                    completion_percentage = int((idx / num_companies) * 100)
-                    st.progress(completion_percentage)
-        st.empty()
-    return filtered_companies
-
-# Function to display filtered companies
-def display_filtered_companies(filtered_companies):
-    filtered_companies.sort(key=lambda x: x['symbol'])
-
-    st.write("### Informe de Balances:")
-    table_data = {
-        "Horario": [],
-        "Empresa": [],
-        "Promedio (%)": []
-    }
-    for item in filtered_companies:
-        time_emoji = '🌞' if item['time'] == 'time-pre-market' else '🌛'
-
-        table_data["Horario"].append(time_emoji)
-        table_data["Empresa"].append(item['symbol'])
-        table_data["Promedio (%)"].append(item['variances'])
-    
-    # Create a DataFrame with the table data
-    df = pd.DataFrame(table_data)
-    # Display the DataFrame as a table
-    st.table(df)
